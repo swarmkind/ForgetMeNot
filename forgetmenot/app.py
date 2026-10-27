@@ -4,6 +4,7 @@ import fcntl
 import os
 from pathlib import Path
 import re
+import shutil
 from typing import Literal
 from urllib.parse import urlsplit
 
@@ -31,10 +32,16 @@ class Login(Input):
     password: str = Field(min_length=1, max_length=1024)
 
 
+class ModelChoice(Input):
+    provider: Literal["openrouter", "chatgpt", "gemini_cli", "claude", "codex"]
+    id: str = Field(min_length=1, max_length=200, pattern=r"^[a-zA-Z0-9][a-zA-Z0-9_./:@+-]*$")
+
+
 class Watch(Input):
     goal: str = Field(min_length=5, max_length=4000)
     interval: int | None = Field(default=None, strict=True)
-    channels: list[Literal["email", "push"]] = Field(default_factory=list, max_length=2)
+    channels: list[Literal["email", "telegram", "push"]] = Field(default_factory=list, max_length=3)
+    model: ModelChoice | None = None
 
 
 class Settings(Input):
@@ -43,11 +50,8 @@ class Settings(Input):
     email: str = Field(default="", max_length=254)
     ntfy_topic: str = Field(default="", max_length=100)
     ntfy_token: str | None = Field(default=None, max_length=1000)
-
-
-class ModelChoice(Input):
-    provider: Literal["openrouter", "chatgpt", "gemini_cli", "claude"]
-    id: str = Field(min_length=1, max_length=200, pattern=r"^[a-zA-Z0-9_./:@+-]+$")
+    telegram_token: str | None = Field(default=None, max_length=200)
+    telegram_chat: str = Field(default="", max_length=100)
 
 
 class OAuthStart(Input):
@@ -148,6 +152,9 @@ def create_app(directory=None, password=None, base_url=None, start_worker=True):
             "claude_connected": bool(store.setting("claude_key")),
             "email": store.setting("email", ""), "smtp_ready": smtp_ready(),
             "ntfy_topic": store.setting("ntfy_topic", ""), "ntfy_token_set": bool(store.setting("ntfy_token")),
+            "telegram_chat": store.setting("telegram_chat", ""), "telegram_token_set": bool(store.setting("telegram_token")),
+            "codex_connected": bool(shutil.which("codex") and (store.directory / "codex" / "auth.json").is_file()),
+            "gemini_available": bool(shutil.which("gemini")),
             "model": store.setting("model", {}), "chatgpt_selected": store.setting("chatgpt_selected"),
             "chatgpt_accounts": [{"id": key, "label": value["email"] + " · " + key[-6:],
                                   "connected": bool(value.get("access_token"))} for key, value in accounts.items()],
@@ -167,7 +174,11 @@ def create_app(directory=None, password=None, base_url=None, start_worker=True):
             raise ProviderError("Use an ntfy topic with 8–100 letters, numbers, hyphens or underscores.")
         if value.claude_key and (not value.claude_key.startswith("sk-ant-api") or "\n" in value.claude_key):
             raise ProviderError("Use a Claude Console API key. Claude subscription OAuth tokens are not accepted.")
-        for name in ("openrouter_key", "claude_key", "ntfy_token"):
+        if value.telegram_token and not re.fullmatch(r"\d+:[a-zA-Z0-9_-]{20,180}", value.telegram_token):
+            raise ProviderError("Use the Telegram bot token supplied by BotFather.")
+        if value.telegram_chat and not re.fullmatch(r"-?\d{1,20}|@[a-zA-Z][a-zA-Z0-9_]{4,32}", value.telegram_chat):
+            raise ProviderError("Use a Telegram chat ID or public channel username.")
+        for name in ("openrouter_key", "claude_key", "ntfy_token", "telegram_token"):
             credential = getattr(value, name)
             if credential is not None:
                 if any(ord(c) < 33 for c in credential):
@@ -180,6 +191,12 @@ def create_app(directory=None, password=None, base_url=None, start_worker=True):
     @app.get("/api/models/{provider}")
     def list_models(provider: str):
         return {"models": providers.models(store, provider)}
+
+    @app.post("/api/codex/connect")
+    def connect_codex():
+        from . import codex_runtime
+        codex_runtime.connect(store)
+        return {"ok": True}
 
     @app.put("/api/model")
     def select_model(value: ModelChoice):
@@ -201,15 +218,21 @@ def create_app(directory=None, password=None, base_url=None, start_worker=True):
             raise ProviderError("Configure an email address and server SMTP before enabling email.")
         if "push" in value.channels and not store.setting("ntfy_topic"):
             raise ProviderError("Configure an ntfy topic before enabling push.")
+        if "telegram" in value.channels and (not store.setting("telegram_token") or not store.setting("telegram_chat")):
+            raise ProviderError("Connect a Telegram bot and chat in Settings before enabling Telegram.")
+        if value.model:
+            available = providers.models(store, value.model.provider)
+            if value.model.provider != "gemini_cli" and value.model.id not in {item["id"] for item in available}:
+                raise ProviderError("Select a model available to this account.")
         return goal
 
     @app.post("/api/watches", status_code=201)
     def add_watch(value: Watch):
-        return {"id": store.create(validate_watch(value), value.interval, value.channels)}
+        return {"id": store.create(validate_watch(value), value.interval, value.channels, value.model.model_dump() if value.model else None)}
 
     @app.put("/api/watches/{watch_id}")
     def edit_watch(watch_id: str, value: Watch):
-        if not store.edit(watch_id, validate_watch(value), value.interval, value.channels):
+        if not store.edit(watch_id, validate_watch(value), value.interval, value.channels, value.model.model_dump() if value.model else None):
             raise HTTPException(404, "Watch not found.")
         return {"ok": True}
 

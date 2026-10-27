@@ -49,6 +49,21 @@ def send_delivery(store, delivery):
         providers.request_json("POST", "https://ntfy.sh", headers=headers, json={
             "topic": topic, "title": "ForgetMeNot: " + delivery["title"], "message": body,
         })
+    elif delivery["channel"] == "telegram":
+        token, chat = store.setting("telegram_token", ""), store.setting("telegram_chat", "")
+        if not token or not chat:
+            raise providers.ProviderError("Connect a Telegram bot and chat in Settings.")
+        text = "ForgetMeNot: " + delivery["title"] + "\n\n" + body
+        while text:
+            end = len(text) if len(text) <= 4000 else text.rfind("\n", 0, 4000)
+            if end <= 0:
+                end = 4000
+            result = providers.request_json("POST", "https://api.telegram.org/bot" + token + "/sendMessage", json={
+                "chat_id": chat, "text": text[:end], "link_preview_options": {"is_disabled": True},
+            })
+            if result.get("ok") is not True:
+                raise providers.ProviderError("Telegram did not accept the notification. Check the bot and chat permissions.")
+            text = text[end:].lstrip("\n")
     else:
         raise providers.ProviderError("Unknown notification channel.")
 
@@ -73,9 +88,7 @@ class Worker:
                 self.store.delivered(delivery)
             except Exception:
                 self.store.delivered(delivery, "Delivery failed. Check channel settings and server connectivity; retry scheduled.")
-        if not self.store.setting("model", {}).get("id"):
-            return
-        watch = self.store.claim()
+        watch = self.store.claim(configured_only=True)
         if not watch:
             return
         try:
@@ -84,7 +97,7 @@ class Worker:
             message = str(exc) if isinstance(exc, providers.ProviderError) else "An unexpected provider error occurred. The check will be retried."
             result = {"outcome": "inconclusive", "title": watch["title"], "approach": watch["approach"],
                       "summary": message, "interval": watch["interval"], "evidence": []}
-            model = self.store.setting("model", {}).get("id", "unconfigured")
+            model = watch["model"].get("provider", "") + "/" + watch["model"].get("id", "unconfigured")
         self.store.finish(watch, result, model)
 
     def run(self):

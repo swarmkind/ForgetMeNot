@@ -146,6 +146,9 @@ def chatgpt_account(store):
 
 
 def models(store, provider):
+    if provider == "codex":
+        from . import codex_runtime
+        return codex_runtime.models(store)
     if provider == "openrouter":
         key = store.setting("openrouter_key")
         if not key:
@@ -316,12 +319,13 @@ def parse_gemini_events(lines):
 
 
 def check(store, watch):
-    selected = store.setting("model", {})
+    selected = watch.get("model") or store.setting("model", {})
     provider, model = selected.get("provider"), selected.get("id")
     if not model:
         raise ProviderError("Choose a provider and model in Settings before starting checks.")
+    from . import codex_runtime
     functions = {"openrouter": openrouter_check, "chatgpt": chatgpt_check,
-                 "claude": claude_check, "gemini_cli": gemini_cli_check}
+                 "claude": claude_check, "gemini_cli": gemini_cli_check, "codex": codex_runtime.check}
     if provider not in functions:
         raise ProviderError("Choose a supported provider.")
     return functions[provider](store, model, prompt(watch)), provider + "/" + model

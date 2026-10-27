@@ -1,0 +1,15 @@
+{
+  "checks": [
+    "Minimal left composer/right eye and three visible controls",
+    "Real Enter save exactly once, pinned model, Shift+Enter/IME, optical contraction",
+    "Edit restores model; unconfigured Telegram rejects save and preserves draft; setup link",
+    "Frequency warning and email/Telegram/push/inbox choices",
+    "Searching, inconclusive, offline and found states follow server state",
+    "Live research history shows actual opened source",
+    "No horizontal overflow in four views at seven viewport widths",
+    "Reduced motion disables lens animation and transition",
+    "Lock returns to protected login",
+    "No uncaught JavaScript errors"
+  ],
+  "isolated_chromium": true
+}

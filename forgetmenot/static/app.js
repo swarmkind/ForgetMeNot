@@ -4,11 +4,7 @@ const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
 const escapeHTML = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const intervals = {60:"every minute",300:"every 5 minutes",900:"every 15 minutes",3600:"hourly",21600:"every 6 hours",86400:"daily",604800:"weekly",2592000:"every 30 days"};
-const examples = {
-  stock:"Let me know when [exact product and variant] is back in stock at [retailer URL], available for delivery to [country], for no more than [price and currency].",
-  research:"Let me know when a new treatment for [condition] is approved by [regulator] in [country]. Distinguish clinical trial results from regulatory approval, and use official sources.",
-  games:"Let me know when a new online co-op game releases on PC with an OpenCritic score of at least 85 from at least 10 critic reviews. It must support two players and have a full release, not early access.",
-};
+const channelNames = {email:"Email",telegram:"Telegram",push:"Push notification"};
 let state = null;
 let currentView = "watches";
 let currentFilter = "all";
@@ -21,12 +17,59 @@ let watchSubmitting = false;
 let lastSavedId = null;
 let lensError = "";
 let serverOffline = false;
+let watchCatalog = [];
+let catalogLoading = false;
+
+function modelKey(model) {
+  return model?.id ? JSON.stringify({provider:model.provider,id:model.id}) : "";
+}
+
+function renderWatchModels(preferred) {
+  const select = $("#watch-model");
+  const previous = preferred || select.value || modelKey(state?.settings.model);
+  const choices = new Map();
+  for (const model of [state?.settings.model,...watchCatalog,...(state?.watches || []).map((watch) => watch.model)]) {
+    if (model?.id) choices.set(modelKey(model), model);
+  }
+  select.replaceChildren(new Option(choices.size ? "Choose a model" : "Connect a model", ""));
+  const names = {codex:"ChatGPT · Codex",chatgpt:"ChatGPT",openrouter:"OpenRouter",claude:"Claude",gemini_cli:"Gemini CLI"};
+  for (const [key, model] of choices) select.add(new Option(`${names[model.provider]} · ${model.name || model.id}`, key));
+  select.value = choices.has(previous) ? previous : choices.keys().next().value || "";
+  updateLens();
+}
+
+async function loadWatchModels() {
+  if (!state || catalogLoading) return;
+  catalogLoading = true;
+  try {
+    const settings = state.settings;
+    const connected = [settings.codex_connected && "codex",settings.openrouter_connected && "openrouter",
+      settings.claude_connected && "claude",settings.chatgpt_selected && "chatgpt",settings.gemini_available && "gemini_cli"].filter(Boolean);
+    const results = await Promise.allSettled(connected.map(async (provider) => {
+      const data = await api(`/api/models/${provider}`);
+      return data.models.map((model) => ({provider,...model}));
+    }));
+    watchCatalog = results.flatMap((result) => result.status === "fulfilled" ? result.value : []);
+    renderWatchModels();
+    const failures = results.filter((result) => result.status === "rejected");
+    if (failures.length && !watchCatalog.length) toast(failures[0].reason.message, true);
+  } finally { catalogLoading = false; }
+}
+
+function updateDeliveryHint() {
+  if (!state) return;
+  const settings = state.settings;
+  const ready = {email:!!(settings.email && settings.smtp_ready),telegram:!!(settings.telegram_chat && settings.telegram_token_set),push:!!settings.ntfy_topic};
+  const missing = $("#notification").value.split(",").filter((channel) => channel && !ready[channel]);
+  $("#configure-delivery").hidden = !missing.length;
+  $("#configure-delivery").textContent = missing.length ? `Set up ${missing.map((channel) => channelNames[channel]).join(" and ")} in Settings ↗` : "";
+}
 
 function updateLens() {
-  const lens = lensState({state, listening, submitting:watchSubmitting, savedId:lastSavedId, error:lensError, offline:serverOffline});
+  const lens = lensState({state, listening, submitting:watchSubmitting, savedId:lastSavedId, error:lensError, offline:serverOffline, modelReady:!!$("#watch-model").value});
   $("#mascot").dataset.mode = lens.mode;
   document.body.dataset.lensMode = lens.mode;
-  $("#input-mode").textContent = lens.mode === "listening" ? "LISTENING" : lens.mode === "locking" ? "FOCUSING" : "TEXT CHANNEL";
+  $("#input-mode").textContent = lens.mode === "listening" ? "LISTENING" : lens.mode === "locking" ? "FOCUSING" : "";
   for (const [id, text] of [["#lens-mode",lens.status],["#lens-title",lens.title],["#lens-detail",lens.detail]]) {
     if ($(id).textContent !== text) $(id).textContent = text;
   }
@@ -80,18 +123,21 @@ function sources(evidence) {
   return `<div class="source-links">${evidence.map((source) => `<a href="${escapeHTML(source.url)}" target="_blank" rel="noopener noreferrer" title="${escapeHTML(source.detail)}">${escapeHTML(source.title)} ↗</a>`).join("")}</div>`;
 }
 
+function researchSteps(activity = []) {
+  return activity.length ? `<details class="research-steps"><summary>Research activity · ${activity.length} steps</summary><ol>${activity.map((step) => `<li>${step.url ? `Opened <a href="${escapeHTML(step.url)}" target="_blank" rel="noopener noreferrer">${escapeHTML(step.url)}</a>` : "Used live web research"}</li>`).join("")}</ol></details>` : "";
+}
+
 function renderWatches() {
   const watches = state.watches;
   $("#nav-count").textContent = watches.filter((w) => w.status === "active").length;
   $("#watch-total").textContent = String(watches.length).padStart(2,"0");
   $("#empty-state").hidden = watches.length > 0;
-  $("#examples").hidden = watches.length > 0;
   const visible = watches.filter((w) => currentFilter === "all" || w.status === currentFilter);
   $("#watchlist").innerHTML = visible.map((watch) => {
-    const status = watch.checking ? "Checking" : watch.status === "matched" ? "Found" : watch.status === "paused" ? "Paused" : watch.error ? "Needs attention" : state.settings.model.id ? "Watching" : "Awaiting setup";
+    const status = watch.checking ? "Checking" : watch.status === "matched" ? "Found" : watch.status === "paused" ? "Paused" : watch.error ? "Needs attention" : watch.model?.id ? "Watching" : "Awaiting setup";
     const type = watch.status === "active" && watch.error ? "error" : watch.status;
     const next = watch.status === "active" ? (watch.checking ? "Checking now" : watch.next_check < Date.now()/1000 ? "Queued for check" : "Next " + date(watch.next_check)) : "Checked " + date(watch.last_check);
-    return `<article class="watch-card" data-id="${watch.id}"><div class="watch-card-top"><h3>${escapeHTML(watch.title)}</h3><span class="status ${type}">${status}</span></div><p class="watch-goal">${escapeHTML(watch.goal)}</p>${watch.summary ? `<p class="watch-summary">${escapeHTML(watch.summary)}</p>` : ""}<div class="watch-meta"><div><span>◷ ${escapeHTML(intervals[watch.interval] || "daily")}${watch.automatic ? " · automatic" : ""}</span><span>${escapeHTML(next)}</span></div><div class="watch-actions"><button class="text-button" data-action="history">History</button><button class="text-button" data-action="edit">Edit</button><button class="text-button" data-action="${watch.status === "active" ? "pause" : "resume"}">${watch.status === "active" ? "Pause" : watch.status === "matched" ? "Rearm" : "Resume"}</button>${watch.status === "active" ? '<button class="text-button" data-action="check">Check now</button>' : ""}<button class="text-button danger" data-action="delete">Delete</button></div></div></article>`;
+    return `<article class="watch-card" data-id="${watch.id}"><div class="watch-card-top"><h3>${escapeHTML(watch.title)}</h3><span class="status ${type}">${status}</span></div><p class="watch-goal">${escapeHTML(watch.goal)}</p>${watch.summary ? `<p class="watch-summary">${escapeHTML(watch.summary)}</p>` : ""}<div class="watch-meta"><div><span>${escapeHTML(watch.model?.id || "Awaiting model")}</span><span>${escapeHTML(intervals[watch.interval] || "daily")}${watch.automatic ? " · automatic" : ""}</span><span>${escapeHTML(watch.channels.map((channel) => channelNames[channel]).join(", ") || "In-app inbox")}</span><span>${escapeHTML(next)}</span></div><div class="watch-actions"><button class="text-button" data-action="history">History</button><button class="text-button" data-action="edit">Edit</button><button class="text-button" data-action="${watch.status === "active" ? "pause" : "resume"}">${watch.status === "active" ? "Pause" : watch.status === "matched" ? "Rearm" : "Resume"}</button>${watch.status === "active" ? '<button class="text-button" data-action="check">Check now</button>' : ""}<button class="text-button danger" data-action="delete">Delete</button></div></div></article>`;
   }).join("") || (watches.length ? '<p class="filtered-empty">No watches in this view.</p>' : "");
 }
 
@@ -102,7 +148,7 @@ function renderInbox() {
   $("#inbox-count").hidden = !unseen;
   $("#inbox-list").innerHTML = notifications.map((notification) => {
     const deliveries = state.inbox.deliveries.filter((d) => d.notification_id === notification.id);
-    return `<article class="notification ${notification.seen ? "" : "unread"}"><h2>${escapeHTML(notification.title)}</h2><p>${escapeHTML(notification.body)}</p>${sources(notification.evidence)}<p class="small muted">Found ${escapeHTML(date(notification.created))}</p>${deliveries.map((d) => `<div class="delivery-state ${d.error ? "failed" : ""}">${d.channel === "email" ? "Email" : "Push"}: ${d.delivered ? "delivered " + escapeHTML(date(d.delivered)) : d.error ? "delivery failed · retry scheduled" : "queued"}</div>`).join("")}</article>`;
+    return `<article class="notification ${notification.seen ? "" : "unread"}"><h2>${escapeHTML(notification.title)}</h2><p>${escapeHTML(notification.body)}</p>${sources(notification.evidence)}<p class="small muted">Found ${escapeHTML(date(notification.created))}</p>${deliveries.map((d) => `<div class="delivery-state ${d.error ? "failed" : ""}">${channelNames[d.channel]}: ${d.delivered ? "delivered " + escapeHTML(date(d.delivered)) : d.error ? "delivery failed · retry scheduled" : "queued"}</div>`).join("")}</article>`;
   }).join("") || '<div class="empty-inbox"><h2>Nothing to interrupt you for. Yet.</h2><p>When a watch finds what you asked for, its evidence will appear here.</p></div>';
 }
 
@@ -110,6 +156,9 @@ function renderSettings() {
   const settings = state.settings;
   $("#email").value = settings.email;
   $("#ntfy-topic").value = settings.ntfy_topic;
+  $("#telegram-chat").value = settings.telegram_chat;
+  $("#telegram-token").placeholder = settings.telegram_token_set ? "Token saved · leave empty to keep it" : "Token from BotFather";
+  $("#codex-status").textContent = settings.codex_connected ? "Local ChatGPT sign-in connected. Research runs through the Codex agent runtime." : "Install Codex CLI and sign in on this server, then connect here.";
   $("#openrouter-status").textContent = settings.openrouter_connected ? "An OpenRouter key is saved securely on this server." : "No OpenRouter key saved yet.";
   $("#claude-status").textContent = settings.claude_connected ? "A Claude API key is saved securely on this server." : "No Claude API key saved yet.";
   $("#smtp-status").textContent = settings.smtp_ready ? "SMTP is configured on this server. Enable email on each watch you want delivered." : "The server needs SMTP_HOST and SMTP_FROM before email can be enabled. See the README.";
@@ -118,6 +167,7 @@ function renderSettings() {
   $("#chatgpt-account").innerHTML = '<option value="">Add a new connection</option>' + settings.chatgpt_accounts.map((a) => `<option value="${escapeHTML(a.id)}">${escapeHTML(a.label)}${a.connected ? "" : " · reconnect"}</option>`).join("");
   $("#chatgpt-account").value = settings.chatgpt_selected || "";
   if (settings.model.provider) $("#provider").value = settings.model.provider;
+  else if (settings.codex_connected) $("#provider").value = "codex";
   $("#model").value = settings.model.id || "";
   $("#current-model").textContent = settings.model.id ? `Current: ${settings.model.provider} / ${settings.model.id}` : "No model selected. Watches can be saved, and will begin after you choose one.";
   showProvider();
@@ -129,12 +179,13 @@ function showProvider() {
 
 function renderStatus() {
   const worker = state.worker;
-  $("#worker-label").textContent = worker.error ? "Worker needs attention" : worker.running ? "Background worker running" : "Background worker offline";
+  $("#worker-label").textContent = worker.error ? "Worker needs attention" : worker.running ? "Worker online" : "Worker offline";
   $("#worker-dot").classList.toggle("offline", !worker.running || !!worker.error);
   $("#model-caption").textContent = state.settings.model.id ? state.settings.model.id : "Choose a model in Settings";
   const banner = $("#connection-banner");
   banner.replaceChildren();
-  const issue = worker.error || (!worker.running ? "The background worker is offline. Checks resume when the server is running." : !state.settings.model.id ? "Your watchlist is ready. Connect an account and choose a model to begin checking. " : "");
+  const connected = state.settings.codex_connected || state.settings.openrouter_connected || state.settings.claude_connected || state.settings.chatgpt_selected || state.settings.gemini_available;
+  const issue = worker.error || (!worker.running ? "The background worker is offline. Checks resume when the server is running." : !connected ? "Connect an AI account in Settings to start checking. " : "");
   banner.hidden = !issue;
   if (issue) {
     banner.append(document.createTextNode(issue + " "));
@@ -155,7 +206,8 @@ async function refresh(initial = false) {
     $("#login-view").hidden = true;
     $("#app").hidden = false;
     renderWatches(); renderInbox(); renderStatus();
-    if (initial) renderSettings();
+    if (initial) { renderSettings(); renderWatchModels(); void loadWatchModels(); }
+    updateDeliveryHint();
     return true;
   } catch (error) {
     if (error.status !== 401) { serverOffline = true; updateLens(); toast(error.message, true); $("#worker-label").textContent = "Server connection lost"; $("#worker-dot").classList.add("offline"); }
@@ -165,13 +217,13 @@ async function refresh(initial = false) {
 
 function navigate(view) {
   currentView = view;
-  ["watches","inbox","settings"].forEach((name) => { $(`#view-${name}`).hidden = name !== view; });
+  ["watches","saved","inbox","settings"].forEach((name) => { $(`#view-${name}`).hidden = name !== view; });
   $$("[data-view]").forEach((button) => {
     const selected = button.dataset.view === view;
     button.classList.toggle("selected", selected);
     if (selected) button.setAttribute("aria-current","page"); else button.removeAttribute("aria-current");
   });
-  $("#breadcrumb").textContent = {watches:"PERSONAL MONITOR / OVERVIEW",inbox:"PERSONAL MONITOR / FINDINGS",settings:"PERSONAL MONITOR / CONNECTIONS"}[view];
+  $("#breadcrumb").textContent = {watches:"New watch",saved:"Watches",inbox:"Inbox",settings:"Connections"}[view];
   if (view === "settings") renderSettings();
   window.scrollTo({top:0,behavior:"instant"});
 }
@@ -182,7 +234,8 @@ function resetWatch() {
   $("#cancel-edit").hidden = true;
   $("#save-watch").innerHTML = 'Set watch <span aria-hidden="true">↗</span>';
   lensError = "";
-  updateLens();
+  renderWatchModels();
+  updateDeliveryHint();
 }
 
 function editWatch(watch) {
@@ -190,22 +243,24 @@ function editWatch(watch) {
   navigate("watches");
   $("#goal").value = watch.goal;
   $("#interval").value = watch.automatic ? "auto" : watch.interval;
-  $("#channel-email").checked = watch.channels.includes("email");
-  $("#channel-push").checked = watch.channels.includes("push");
-  $("#advanced").open = true;
+  const channels = watch.channels.join(",");
+  if (![...$("#notification").options].some((option) => option.value === channels)) $("#notification").add(new Option(watch.channels.map((channel) => channelNames[channel]).join(" + "), channels));
+  $("#notification").value = channels;
+  renderWatchModels(modelKey(watch.model));
+  updateDeliveryHint();
   $("#cancel-edit").hidden = false;
   $("#save-watch").textContent = "Save & restart watch ↗";
   $("#goal").focus();
 }
 
 async function saveSettings() {
-  const values = {email:$("#email").value.trim(),ntfy_topic:$("#ntfy-topic").value.trim()};
-  for (const [field,key] of [["#openrouter-key","openrouter_key"],["#claude-key","claude_key"],["#ntfy-token","ntfy_token"]]) {
+  const values = {email:$("#email").value.trim(),ntfy_topic:$("#ntfy-topic").value.trim(),telegram_chat:$("#telegram-chat").value.trim()};
+  for (const [field,key] of [["#openrouter-key","openrouter_key"],["#claude-key","claude_key"],["#ntfy-token","ntfy_token"],["#telegram-token","telegram_token"]]) {
     if ($(field).value) values[key] = $(field).value.trim();
   }
   const saved = await api("/api/settings", "PUT", values);
   state.settings = saved;
-  ["#openrouter-key","#claude-key","#ntfy-token"].forEach((id) => { $(id).value = ""; });
+  ["#openrouter-key","#claude-key","#ntfy-token","#telegram-token"].forEach((id) => { $(id).value = ""; });
   return saved;
 }
 
@@ -220,8 +275,10 @@ $$("[data-filter]").forEach((button) => button.addEventListener("click", () => {
   $$("[data-filter]").forEach((item) => { item.classList.toggle("active", item === button); item.setAttribute("aria-pressed", String(item === button)); });
   renderWatches();
 }));
-$$("[data-example]").forEach((button) => button.addEventListener("click", () => { resetWatch(); $("#goal").value = examples[button.dataset.example]; $("#goal").focus(); }));
 $("#cancel-edit").addEventListener("click", resetWatch);
+$("#watch-model").addEventListener("change", updateLens);
+$("#notification").addEventListener("change", updateDeliveryHint);
+$("#configure-delivery").addEventListener("click", () => navigate("settings"));
 $("#goal").addEventListener("focus", () => { listening = true; updateLens(); });
 $("#goal").addEventListener("blur", () => { listening = false; updateLens(); });
 $("#goal").addEventListener("input", () => {
@@ -239,13 +296,14 @@ $("#goal").addEventListener("keydown", (event) => {
 });
 $("#interval").addEventListener("change", () => {
   $("#frequency-note").textContent = $("#interval").value === "60" ? "Every-minute checks can use 1,440 model and search requests per day, per watch. Checks run sequentially; a slow search may delay the next one." : "Automatic checks usually start daily. Frequent checks use more model and search allowance.";
+  $("#frequency-note").hidden = $("#interval").value !== "60";
 });
 $("#watch-form").addEventListener("submit", (event) => {
   event.preventDefault();
   busy(event.submitter, async () => {
     if (/\[[^\]]+\]/.test($("#goal").value) && !confirm("This goal still contains square-bracket placeholders. Save it anyway? The model may need more details.")) return;
     const body = {goal:$("#goal").value.trim(), interval:$("#interval").value === "auto" ? null : Number($("#interval").value),
-      channels:[...($("#channel-push").checked ? ["push"] : []),...($("#channel-email").checked ? ["email"] : [])]};
+      channels:$("#notification").value.split(",").filter(Boolean),model:$("#watch-model").value ? JSON.parse($("#watch-model").value) : null};
     watchSubmitting = true;
     listening = false;
     lensError = "";
@@ -278,7 +336,7 @@ $("#watchlist").addEventListener("click", (event) => {
     if (action === "history") {
       const history = await api(`/api/watches/${watch.id}/history`);
       $("#history-title").textContent = watch.title;
-      $("#history-content").innerHTML = (watch.approach ? `<div class="approach-note">${escapeHTML(watch.approach)}</div>` : "") + history.checks.map((check) => `<article class="history-item"><div><span class="status ${check.outcome === "matched" ? "matched" : check.outcome === "inconclusive" ? "error" : ""}">${escapeHTML(check.outcome)}</span><span class="history-time">${escapeHTML(date(check.checked))} · ${escapeHTML(check.model)}</span></div><p>${escapeHTML(check.summary)}</p>${sources(check.evidence)}</article>`).join("") + (!history.checks.length ? '<p class="muted">No checks yet. Choose a model in Settings to start.</p>' : "");
+      $("#history-content").innerHTML = (watch.approach ? `<div class="approach-note">${escapeHTML(watch.approach)}</div>` : "") + history.checks.map((check) => `<article class="history-item"><div><span class="status ${check.outcome === "matched" ? "matched" : check.outcome === "inconclusive" ? "error" : ""}">${escapeHTML(check.outcome)}</span><span class="history-time">${escapeHTML(date(check.checked))} · ${escapeHTML(check.model)}</span></div><p>${escapeHTML(check.summary)}</p>${sources(check.evidence)}${researchSteps(check.activity)}</article>`).join("") + (!history.checks.length ? '<p class="muted">No checks yet. Choose a model to start.</p>' : "");
       $("#history-dialog").showModal();
       return;
     }
@@ -292,10 +350,13 @@ $("#watchlist").addEventListener("click", (event) => {
 $("#close-history").addEventListener("click", () => $("#history-dialog").close());
 $("#mark-read").addEventListener("click", () => busy($("#mark-read"), async () => { await api("/api/inbox/read","POST",{}); await refresh(); }));
 $("#provider").addEventListener("change", () => { showProvider(); $("#model-list").replaceChildren(); $("#model").value = ""; });
-$("#settings-form").addEventListener("submit", (event) => { event.preventDefault(); busy(event.submitter, async () => { await saveSettings(); await refresh(); toast("Connections saved."); }); });
+$("#settings-form").addEventListener("submit", (event) => { event.preventDefault(); busy(event.submitter, async () => { await saveSettings(); await refresh(); await loadWatchModels(); toast("Connections saved."); }); });
+$("#connect-codex").addEventListener("click", () => busy($("#connect-codex"), async () => { await api("/api/codex/connect","POST",{}); await refresh(); renderSettings(); await loadWatchModels(); toast("Local ChatGPT sign-in connected."); }));
 $("#load-models").addEventListener("click", () => busy($("#load-models"), async () => {
   await saveSettings();
   const result = await api(`/api/models/${$("#provider").value}`);
+  watchCatalog = watchCatalog.filter((model) => model.provider !== $("#provider").value).concat(result.models.map((model) => ({provider:$("#provider").value,...model})));
+  renderWatchModels();
   $("#model-list").innerHTML = result.models.map((model) => `<option value="${escapeHTML(model.id)}">${escapeHTML(model.name)}</option>`).join("");
   if (result.models.length === 1) $("#model").value = result.models[0].id;
   $("#model-note").textContent = `${result.models.length} models loaded. Choose a model ID below.${$("#provider").value === "gemini_cli" ? " You may also enter a model ID supported by your CLI." : ""}`;
@@ -319,7 +380,6 @@ $("#disconnect-account").addEventListener("click", () => busy($("#disconnect-acc
   await api("/api/chatgpt/disconnect","POST",{account_id:$("#chatgpt-account").value}); await refresh(); renderSettings(); toast("ChatGPT session revoked and disconnected.");
 }));
 
-$("#today").textContent = new Date().toLocaleDateString(undefined,{day:"numeric",month:"long",year:"numeric"}).toUpperCase();
 (async () => {
   const query = new URLSearchParams(location.search);
   history.replaceState({},"",location.pathname);

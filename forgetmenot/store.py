@@ -38,12 +38,12 @@ class Store:
                     approach TEXT NOT NULL DEFAULT '', summary TEXT NOT NULL DEFAULT '',
                     error TEXT NOT NULL DEFAULT '', failures INTEGER NOT NULL DEFAULT 0,
                     revision INTEGER NOT NULL DEFAULT 0, lease_until REAL NOT NULL DEFAULT 0,
-                    claim TEXT
+                    claim TEXT, model TEXT NOT NULL DEFAULT '{}'
                 );
                 CREATE TABLE IF NOT EXISTS checks (
                     id INTEGER PRIMARY KEY, watch_id TEXT NOT NULL REFERENCES watches(id) ON DELETE CASCADE,
                     checked REAL NOT NULL, outcome TEXT NOT NULL, summary TEXT NOT NULL,
-                    evidence TEXT NOT NULL, model TEXT NOT NULL
+                    evidence TEXT NOT NULL, model TEXT NOT NULL, activity TEXT NOT NULL DEFAULT '[]'
                 );
                 CREATE INDEX IF NOT EXISTS checks_watch ON checks(watch_id, id DESC);
                 CREATE TABLE IF NOT EXISTS notifications (
@@ -58,6 +58,12 @@ class Store:
                     UNIQUE(notification_id, channel)
                 );
             """)
+            columns = {row["name"] for row in db.execute("PRAGMA table_info(watches)")}
+            if "model" not in columns:
+                db.execute("ALTER TABLE watches ADD COLUMN model TEXT NOT NULL DEFAULT '{}'")
+                db.execute("UPDATE watches SET model=?", (json.dumps(self.setting("model", {})),))
+            if "activity" not in {row["name"] for row in db.execute("PRAGMA table_info(checks)")}:
+                db.execute("ALTER TABLE checks ADD COLUMN activity TEXT NOT NULL DEFAULT '[]'")
         os.chmod(self.path, 0o600)
 
     @contextmanager
@@ -80,6 +86,8 @@ class Store:
         encrypted = self.cipher.encrypt(json.dumps(value).encode()).decode()
         with self.connect() as db:
             db.execute("INSERT OR REPLACE INTO settings VALUES (?,?)", (name, encrypted))
+            if name == "model" and isinstance(value, dict) and value.get("id"):
+                db.execute("UPDATE watches SET model=? WHERE model='{}'", (json.dumps(value),))
 
     def host_id(self):
         current = self.setting("host_id")
@@ -97,17 +105,19 @@ class Store:
     def watch_dict(row):
         result = dict(row)
         result["channels"] = json.loads(result["channels"])
+        result["model"] = json.loads(result["model"])
         result["checking"] = bool(result.pop("claim") and result["lease_until"] > time.time())
         result.pop("lease_until")
         return result
 
-    def create(self, goal, interval, channels):
+    def create(self, goal, interval, channels, model=None):
         watch_id, now = str(uuid.uuid4()), time.time()
+        selected = model if model is not None else self.setting("model", {})
         with self.connect() as db:
             db.execute("""INSERT INTO watches
-                (id,goal,title,interval,automatic,channels,created,next_check)
-                VALUES (?,?,?,?,?,?,?,?)""",
-                (watch_id, goal, goal[:90], interval or 86400, interval is None, json.dumps(channels), now, now))
+                (id,goal,title,interval,automatic,channels,created,next_check,model)
+                VALUES (?,?,?,?,?,?,?,?,?)""",
+                (watch_id, goal, goal[:90], interval or 86400, interval is None, json.dumps(channels), now, now, json.dumps(selected)))
         return watch_id
 
     def update(self, watch_id, action):
@@ -121,25 +131,29 @@ class Store:
                     claim=NULL,lease_until=0 WHERE id=?""", (time.time(), watch_id))
             return result.rowcount > 0
 
-    def edit(self, watch_id, goal, interval, channels):
+    def edit(self, watch_id, goal, interval, channels, model=None):
         with self.connect() as db:
+            current = db.execute("SELECT model FROM watches WHERE id=?", (watch_id,)).fetchone()
+            if not current:
+                return False
+            selected = json.dumps(model) if model is not None else current["model"]
             result = db.execute("""UPDATE watches SET goal=?,title=?,interval=?,automatic=?,channels=?,
                 summary='',approach='',error='',failures=0,last_check=NULL,status='active',next_check=?,
-                revision=revision+1,claim=NULL,lease_until=0 WHERE id=?""",
-                (goal, goal[:90], interval or 86400, interval is None, json.dumps(channels), time.time(), watch_id))
+                revision=revision+1,claim=NULL,lease_until=0,model=? WHERE id=?""",
+                (goal, goal[:90], interval or 86400, interval is None, json.dumps(channels), time.time(), selected, watch_id))
             return result.rowcount > 0
 
-    def claim(self, now=None):
+    def claim(self, now=None, configured_only=False):
         now = now or time.time()
         with self.connect() as db:
             db.execute("BEGIN IMMEDIATE")
             row = db.execute("""SELECT * FROM watches WHERE status='active' AND next_check<=?
-                AND lease_until<=? ORDER BY next_check LIMIT 1""", (now, now)).fetchone()
+                AND lease_until<=? AND (?=0 OR model<>'{}') ORDER BY next_check LIMIT 1""", (now, now, configured_only)).fetchone()
             if not row:
                 return None
             token = str(uuid.uuid4())
             db.execute("UPDATE watches SET claim=?,lease_until=? WHERE id=?", (token, now + 600, row["id"]))
-            return dict(row, claim=token)
+            return dict(row, claim=token, model=json.loads(row["model"]))
 
     def finish(self, watch, result, model, now=None):
         now = now or time.time()
@@ -157,8 +171,8 @@ class Store:
                  watch["id"], watch["revision"], watch["claim"]))
             if not changed.rowcount:
                 return False
-            db.execute("INSERT INTO checks(watch_id,checked,outcome,summary,evidence,model) VALUES (?,?,?,?,?,?)",
-                       (watch["id"], now, result["outcome"], result["summary"], json.dumps(result["evidence"]), model))
+            db.execute("INSERT INTO checks(watch_id,checked,outcome,summary,evidence,model,activity) VALUES (?,?,?,?,?,?,?)",
+                       (watch["id"], now, result["outcome"], result["summary"], json.dumps(result["evidence"]), model, json.dumps(result.get("activity", []))))
             if result["outcome"] == "matched" or failures == 3:
                 attention = result["outcome"] != "matched"
                 title = ("Needs attention: " if attention else "") + result["title"]
@@ -172,7 +186,7 @@ class Store:
     def history(self, watch_id):
         with self.connect() as db:
             rows = db.execute("SELECT * FROM checks WHERE watch_id=? ORDER BY id DESC LIMIT 100", (watch_id,)).fetchall()
-        return [dict(row, evidence=json.loads(row["evidence"])) for row in rows]
+        return [dict(row, evidence=json.loads(row["evidence"]), activity=json.loads(row["activity"])) for row in rows]
 
     def inbox(self):
         with self.connect() as db:

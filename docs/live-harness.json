@@ -1,0 +1,86 @@
+{
+  "checks": [
+    {
+      "goal": "Notify me if the official python.org downloads page currently offers any stable Python 3 release for download. The version need only start with 3; use the official downloads page as evidence.",
+      "expected": "matched",
+      "outcome": "matched",
+      "summary": "The official downloads page currently offers Python 3.15.2, released October 25, 2026. Its 3.15 series is listed in bugfix maintenance, satisfying the stable Python 3 requirement. This is the first check.",
+      "evidence": [
+        {
+          "url": "https://www.python.org/downloads/",
+          "title": "Download Python | Python.org",
+          "detail": "Checked October 27, 2026: lists Python 3.15.2 with an October 25, 2026 release date and a Download link; identifies Python 3.15 as in bugfix maintenance, separately from the 3.16 prerelease series."
+        }
+      ],
+      "activity": [
+        {
+          "tool": "web_search",
+          "action": "open_page",
+          "url": "https://www.python.org/downloads/"
+        }
+      ],
+      "seconds": 14.5,
+      "model": "codex/gpt-6.1-sol"
+    },
+    {
+      "goal": "Notify me if the official python.org downloads page currently offers a stable Python 9 release for download. This requires the major version to be exactly 9; Python 3 does not qualify. Use the official downloads page as evidence.",
+      "expected": "waiting",
+      "outcome": "waiting",
+      "summary": "As of October 27, 2026, the official downloads page offers no stable Python 9 release. It lists Python 3.15 as a bugfix release and Python 3.16 as a prerelease. This is the first check; no previous result exists for comparison.",
+      "evidence": [
+        {
+          "url": "https://www.python.org/downloads/",
+          "title": "Download Python | Python.org",
+          "detail": "Checked October 27, 2026. The official page lists active Python 3.x releases, including stable Python 3.15.2 dated October 25, 2026, and no Python 9 download."
+        }
+      ],
+      "activity": [
+        {
+          "tool": "web_search",
+          "action": "open_page",
+          "url": "https://www.python.org/downloads/"
+        }
+      ],
+      "seconds": 14.4,
+      "model": "codex/gpt-6.1-sol"
+    }
+  ],
+  "single_notification": true,
+  "external_delivery": false,
+  "discovery_check": {
+    "goal": "Notify me if the PC co-op game Split Fiction has been released, supports online co-op, and has an overall Steam user review rating of at least 85% positive with at least 1,000 reviews. Discover the official Steam listing yourself. Verify every condition from current sources; quote the exact positive percentage and review count. If a percentage or count cannot be verified, return inconclusive. Do not silently substitute recent reviews for all reviews.",
+    "outcome": "inconclusive",
+    "summary": "Steam confirms release on March 6, 2025, Windows support, and Online Co-op. It currently displays \u201c96% of the 24,129 user reviews\u201d for English reviews only. The overall all-language positive percentage and corresponding review count could not be verified, so all conditions cannot be confirmed. This is the first check; no previous result exists for comparison.",
+    "approach": "Discovered and opened the official Steam listing for app 2001120. Checked release status, Windows support, online co-op, and all-time reviews. Required an overall, all-language review percentage and count; did not substitute English-only or recent reviews. Attempts to retrieve all-language review data were unavailable.",
+    "evidence": [
+      {
+        "url": "https://store.steampowered.com/app/2001120/Split_Fiction/?cc=us&l=english",
+        "title": "Split Fiction on Steam",
+        "detail": "Opened October 27, 2026. Official listing identifies Hazelight Studios and Electronic Arts, release date March 6, 2025, Windows system requirements, and Online Co-op. Shows all-time English reviews as 96% positive from 24,129 reviews; this does not establish the overall all-language rating."
+      }
+    ],
+    "activity": [
+      {
+        "tool": "web_search",
+        "action": "search"
+      },
+      {
+        "tool": "web_search",
+        "action": "open_page",
+        "url": "https://store.steampowered.com/app/2001120/Split_Fiction/?cc=us&l=english"
+      },
+      {
+        "tool": "web_search",
+        "action": "open_page",
+        "url": "https://store.steampowered.com/app/2001120/Split_Fiction/?l=all"
+      },
+      {
+        "tool": "web_search",
+        "action": "open_page",
+        "url": "https://store.steampowered.com/app/2001120/Split_Fiction/?l=english&filterLanguage=all"
+      }
+    ],
+    "seconds": 29.0,
+    "model": "codex/gpt-6.1-sol"
+  }
+}
