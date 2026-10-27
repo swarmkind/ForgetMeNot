@@ -1,6 +1,6 @@
 # ForgetMeNot
 
-A little less to remember. A small, self-hosted application that keeps checking for things you care about and tells you when the right moment arrives.
+You can forget. I won’t. A small, self-hosted application that keeps checking for things you care about and tells you when the right moment arrives.
 
 Write a goal in plain English: an item returning to stock, a preorder opening, a promotion, a particular bond yield crossing a threshold, an approved treatment, or a well-reviewed co-op game. Choose your AI account and model. ForgetMeNot searches for current evidence on a persistent schedule, keeps a history, and delivers matches to your inbox, email, or phone.
 
@@ -8,9 +8,12 @@ Write a goal in plain English: an item returning to stock, a preorder opening, a
 
 ![ForgetMeNot watchlist](docs/preview.jpg)
 
+[Listening](docs/listening.jpg) · [Focus acquired](docs/focused.jpg) · [Phone layout](docs/mobile.jpg)
+
 ## What it does
 
 - Plain-language watch creation, editing, pause/resume, immediate checks and history.
+- A responsive optical mascot: receptive while you type, focused when you submit, and tied to real check/worker states. Enter sets a watch; Shift+Enter adds a line. Animation respects reduced-motion preferences. No microphone or camera access.
 - Automatic check frequency or fixed intervals: minute, 5/15 minutes, hourly, 6 hours, daily, weekly, or 30 days.
 - Provider-selected search strategy with evidence links and an explanation of what it checks.
 - Separate **waiting**, **matched**, and **inconclusive** outcomes. Unavailable sources and failed searches never count as confirmed matches.
@@ -146,6 +149,7 @@ Keep the default loopback binding or use the SSH tunnel. For a private network d
 uv sync --frozen
 uv run python -m unittest discover -s tests -v
 node --check forgetmenot/static/app.js
+node tests/mascot.test.cjs
 ```
 
 The test suite uses temporary data and mocked provider calls: no real account tokens, paid inference, email or push sends. An optional [GitHub Actions template](docs/github-actions-tests.yml) runs these checks on Python 3.12 and 3.13. To enable it, copy it to `.github/workflows/tests.yml` using a GitHub connection with workflow permission; the connection used for this publication lacks that permission, so automated CI is not enabled. See [verification notes](docs/VERIFICATION.md) for what was actually checked in this checkout.

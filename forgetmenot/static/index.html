@@ -3,63 +3,80 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="theme-color" content="#f6f5ef">
-  <title>ForgetMeNot — a little less to remember</title>
-  <meta name="description" content="A quiet place for things worth waiting for. Personal AI watches with evidence, durable schedules and thoughtful notifications.">
-  <link rel="icon" href="/static/flower.svg" type="image/svg+xml">
+  <meta name="theme-color" content="#101110">
+  <title>ForgetMeNot — persistent by design</title>
+  <meta name="description" content="Your patient, persistent lookout. Tell ForgetMeNot what matters, and leave the watching to the machine.">
+  <link rel="icon" href="/static/lens.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/mascot.js" defer></script>
   <script src="/static/app.js" defer></script>
 </head>
 <body>
   <div id="toast" role="status" aria-live="polite" hidden></div>
   <main id="login-view" class="login-view">
     <form id="login-form" class="login-card">
-      <img src="/static/flower.svg" width="54" height="54" alt="">
-      <p class="eyebrow">A LITTLE LESS TO REMEMBER</p>
+      <div class="login-optic" aria-hidden="true"><span></span></div>
+      <p class="eyebrow">PERSISTENT BY DESIGN</p>
       <h1>ForgetMeNot<span>.</span></h1>
-      <p>A quiet place for the things you don’t want to lose track of.</p>
+      <p>Something on your mind.<br>A machine to keep it there.</p>
       <label for="password">Your instance password</label>
       <input id="password" type="password" autocomplete="current-password" required maxlength="1024">
       <button class="primary" type="submit">Unlock your watchlist <span aria-hidden="true">↗</span></button>
       <p class="small muted">Your server keeps watch, even when this tab is closed.</p>
+      <span class="login-signature">SWARMKIND / PERSONAL INTELLIGENCE</span>
     </form>
   </main>
 
   <div id="app" class="app-shell" hidden>
     <aside class="sidebar">
-      <a class="wordmark" href="/" aria-label="ForgetMeNot home"><img src="/static/flower.svg" width="30" height="30" alt="">ForgetMeNot<span>.</span></a>
-      <p class="sidebar-caption">A LITTLE LESS TO REMEMBER</p>
+      <a class="wordmark" href="/" aria-label="ForgetMeNot home"><img src="/static/lens.svg" width="30" height="30" alt="">ForgetMeNot<span>.</span></a>
+      <p class="sidebar-caption">PERSISTENT INTELLIGENCE</p>
       <nav aria-label="Main navigation">
         <button class="nav-item selected" data-view="watches" aria-current="page"><span aria-hidden="true">◷</span> My watches <span id="nav-count" class="nav-count">0</span></button>
         <button class="nav-item" data-view="inbox"><span aria-hidden="true">▱</span> Inbox <span id="inbox-count" class="nav-count" hidden>0</span></button>
         <button class="nav-item" data-view="settings"><span aria-hidden="true">⚙</span> Settings</button>
       </nav>
-      <div class="sidebar-note"><div class="mini-flower" aria-hidden="true">✳</div><p>Some things are worth<br>waiting for.</p><span>I’ll keep an eye on them.</span></div>
-      <div class="sidebar-bottom"><p><span id="worker-dot" class="dot"></span><span id="worker-label">Connecting</span></p><button id="logout" class="text-button">Lock instance ↗</button><span class="swarmkind">MADE BY SWARMKIND</span></div>
+      <div class="sidebar-note"><div class="signal-mark" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div><p>Patient.<br>Particular.<br>Persistent.</p><span>A little less on your mind.</span></div>
+      <div class="sidebar-bottom"><p><span id="worker-dot" class="dot"></span><span id="worker-label">Connecting</span></p><button id="logout" class="text-button" data-lock>Lock instance ↗</button><span class="swarmkind">MADE BY SWARMKIND</span></div>
     </aside>
 
     <main class="workspace">
-      <header class="topbar"><span id="breadcrumb">Your personal lookout</span><span class="private-label"><span aria-hidden="true">◈</span> YOUR INSTANCE · YOUR DATA</span></header>
+      <header class="topbar"><span id="breadcrumb">PERSONAL MONITOR / OVERVIEW</span><span class="private-label"><span aria-hidden="true">◈</span> PRIVATE INSTANCE</span><button class="mobile-lock text-button" data-lock aria-label="Lock instance">Lock ↗</button></header>
       <div id="connection-banner" class="banner" hidden></div>
 
       <section id="view-watches" class="page" aria-labelledby="watches-heading">
-        <div class="page-heading"><div><p class="eyebrow">SPACE FOR EVERYTHING ELSE</p><h1 id="watches-heading">Leave it with me<span>.</span></h1><p>Tell me what matters. I’ll look out for the right moment.</p></div><div class="date-mark"><span id="today"></span><span class="handwritten">No need to keep checking.</span></div></div>
-        <div class="compose-grid">
+        <div class="mission-grid">
+        <div class="mission-input">
+        <div class="page-heading"><div><p class="eyebrow"><span class="red-rule"></span> A MIND THAT STAYS ON IT</p><h1 id="watches-heading">You can forget.<br><em>I won’t.</em></h1><p>The hard-to-find thing. The right moment.<br>Give me an objective. I’ll keep it in sight.</p></div></div>
           <form id="watch-form" class="compose-card">
-            <div class="card-heading"><span class="number-label">01 / A NEW WATCH</span><span class="tiny-flower" aria-hidden="true">✳</span></div>
-            <label for="goal" class="compose-label">What would you like me to look out for?</label>
-            <textarea id="goal" rows="3" minlength="5" maxlength="4000" required placeholder="Let me know when a great new co-op game is out on PC, with an OpenCritic score of 85 or above…"></textarea>
-            <div class="compose-hint"><span aria-hidden="true">✧</span> A clear goal is enough. I’ll work out how to check it.</div>
+            <div class="card-heading"><span class="number-label">01 / NEW OBJECTIVE</span><span class="input-indicator"><i aria-hidden="true"></i><span id="input-mode">TEXT CHANNEL</span></span></div>
+            <label for="goal" class="compose-label">What should I keep an eye on?</label>
+            <textarea id="goal" rows="3" minlength="5" maxlength="4000" required aria-describedby="input-hint" placeholder="Tell me when that sold-out camera is back. Or when the next great co-op game finally arrives…"></textarea>
+            <div id="input-hint" class="compose-hint">Be specific about what matters. I’ll work out where to look.</div>
             <details id="advanced"><summary>Fine-tune this watch <span aria-hidden="true">+</span></summary><div class="advanced-fields"><label for="interval">Check frequency</label><select id="interval"><option value="auto">Let the AI choose</option><option value="60">Every minute</option><option value="300">Every 5 minutes</option><option value="900">Every 15 minutes</option><option value="3600">Hourly</option><option value="21600">Every 6 hours</option><option value="86400">Daily</option><option value="604800">Weekly</option><option value="2592000">Every 30 days</option></select><p id="frequency-note" class="small muted">Automatic checks usually start daily. Frequent checks use more model and search allowance.</p><fieldset><legend>Notify me through</legend><label class="check"><input type="checkbox" checked disabled> In-app inbox <span class="muted">always on</span></label><label class="check"><input id="channel-push" type="checkbox"> Push via ntfy</label><label class="check"><input id="channel-email" type="checkbox"> Email</label></fieldset></div></details>
-            <div class="compose-footer"><span id="model-caption" class="small muted">Choose a model in Settings</span><div><button id="cancel-edit" type="button" class="secondary" hidden>Cancel</button><button id="save-watch" type="submit" class="primary">Keep an eye on it <span aria-hidden="true">↗</span></button></div></div>
+            <div class="compose-footer"><span class="keyboard-hint"><kbd>↵</kbd> to commit <span>· Shift + Enter for a new line</span></span><div><button id="cancel-edit" type="button" class="secondary" hidden>Cancel</button><button id="save-watch" type="submit" class="primary">Set watch <span aria-hidden="true">↗</span></button></div></div>
           </form>
-          <aside class="quiet-card"><span class="number-label">A LITTLE PEACE OF MIND</span><div class="botanical" aria-hidden="true"><svg viewBox="0 0 220 175" fill="none"><path d="M108 170c-2-48 4-83 33-119M108 171c-1-44-27-56-51-80M110 154c18-16 37-18 55-15M113 113c-7-22-21-32-37-34" stroke="#547059" stroke-width="2"/><path d="M108 148c-1-26-30-48-47-38 3 22 24 36 47 38ZM119 147c12-25 34-25 45-10-10 17-27 23-45 10Z" fill="#a8b498"/><g transform="translate(142 51)"><ellipse cy="-19" rx="13" ry="19" fill="#8f97c6"/><ellipse cy="-19" rx="13" ry="19" fill="#a8add5" transform="rotate(72)"/><ellipse cy="-19" rx="13" ry="19" fill="#8f97c6" transform="rotate(144)"/><ellipse cy="-19" rx="13" ry="19" fill="#b8bcdd" transform="rotate(216)"/><ellipse cy="-19" rx="13" ry="19" fill="#9ca3cf" transform="rotate(288)"/><circle r="7" fill="#e6c87b"/></g><g transform="translate(58 88) scale(.62)"><ellipse cy="-19" rx="13" ry="19" fill="#c2c6e3"/><ellipse cy="-19" rx="13" ry="19" fill="#a8add5" transform="rotate(72)"/><ellipse cy="-19" rx="13" ry="19" fill="#c2c6e3" transform="rotate(144)"/><ellipse cy="-19" rx="13" ry="19" fill="#a8add5" transform="rotate(216)"/><ellipse cy="-19" rx="13" ry="19" fill="#b8bcdd" transform="rotate(288)"/><circle r="7" fill="#e6c87b"/></g></svg></div><h2>You can put<br>a pin in that.</h2><p>The sold-out thing. The next big discovery. The moment you’ve been waiting for.</p><div class="quiet-footer"><span class="dot"></span> Remembered here. Off your mind.</div></aside>
+          <div class="model-strip"><span class="micro-dot"></span><span id="model-caption">Choose a model in Settings</span><span>YOUR ACCOUNT. YOUR CONTROL.</span></div>
+        </div>
+          <aside id="mascot" class="machine" data-mode="standby" aria-label="ForgetMeNot machine status">
+            <div class="machine-header"><span>FMN—01</span><span id="lens-mode">STANDING BY</span><span class="machine-light" aria-hidden="true"></span></div>
+            <div class="optic-stage" aria-hidden="true">
+              <div class="optic-coordinate coordinate-top">01</div><div class="optic-coordinate coordinate-bottom">∞</div>
+              <div class="optic-reticle"><i></i><i></i><i></i><i></i></div>
+              <div class="optic-scale"></div>
+              <div class="optic-housing"><div class="optic-bezel"><div class="optic-glass"><div class="optic-corona"></div><div class="optic-core"></div><div class="optic-reflection"></div></div></div></div>
+              <div class="focus-brackets"><i></i><i></i><i></i><i></i></div>
+            </div>
+            <div class="machine-message" aria-live="polite" aria-atomic="true"><p id="lens-title">At your attention.</p><span id="lens-detail">Give me something worth remembering.</span></div>
+            <div class="machine-telemetry"><div><span>OBJECTIVES</span><strong id="machine-count">00</strong></div><div><span>WORKER</span><strong id="machine-worker">CONNECTING</strong></div><div><span>INPUT</span><strong>TEXT ONLY</strong></div></div>
+            <div class="machine-footer"><span class="micro-dot"></span> PATIENCE IS A SYSTEM PROPERTY.<span aria-hidden="true">+</span></div>
+          </aside>
         </div>
         <div class="watchlist-heading"><h2>Your watchlist <span id="watch-total">00</span></h2><div class="filters" role="group" aria-label="Filter watches"><button data-filter="all" class="active" aria-pressed="true">All</button><button data-filter="active" aria-pressed="false">Watching</button><button data-filter="matched" aria-pressed="false">Found</button><button data-filter="paused" aria-pressed="false">Paused</button></div></div>
         <div id="watchlist" class="watchlist"></div>
-        <div id="empty-state" class="empty-state"><span class="empty-icon" aria-hidden="true">↳</span><div><h3>A little inspiration, if you need it.</h3><p>Choose an example, add your details, and make it yours.</p></div></div>
+        <div id="empty-state" class="empty-state"><span class="empty-icon" aria-hidden="true">↳</span><div><h3>Every watch begins with a possibility.</h3><p>Start with one of these. Make it particular.</p></div></div>
         <div id="examples" class="examples"><button data-example="stock"><span class="example-icon" aria-hidden="true">▧</span><span><strong>The one that’s sold out</strong><small>Stock, preorders & availability</small></span><span aria-hidden="true">↗</span></button><button data-example="research"><span class="example-icon" aria-hidden="true">✧</span><span><strong>A discovery worth knowing</strong><small>Research & treatment developments</small></span><span aria-hidden="true">↗</span></button><button data-example="games"><span class="example-icon" aria-hidden="true">⌘</span><span><strong>Your next favourite game</strong><small>Releases with the ratings to match</small></span><span aria-hidden="true">↗</span></button></div>
-        <footer class="page-footer"><span>A small place for long-term possibilities.</span><span>FORGETMENOT / 0.1</span></footer>
+        <footer class="page-footer"><span>A LONG MEMORY. A QUIET PRESENCE.</span><span id="today"></span><span>FORGETMENOT / SWARMKIND</span></footer>
       </section>
 
       <section id="view-inbox" class="page" hidden aria-labelledby="inbox-heading"><div class="page-heading"><div><p class="eyebrow">THE MOMENT YOU WERE WAITING FOR</p><h1 id="inbox-heading">Worth your attention<span>.</span></h1><p>Findings with their sources, and notices when a watch needs your help.</p></div><button id="mark-read" class="secondary">Mark all as read</button></div><div id="inbox-list" class="inbox-list"></div></section>

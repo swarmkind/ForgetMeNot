@@ -373,10 +373,13 @@ class ApiAuthTests(unittest.TestCase):
     def test_frontend_and_security_headers(self):
         html = self.client.get("/")
         self.assertEqual(html.status_code, 200)
-        self.assertIn("Leave it with me", html.text)
+        self.assertIn("You can forget.", html.text)
+        self.assertIn('id="mascot"', html.text)
         self.assertIn("frame-ancestors 'none'", html.headers["content-security-policy"])
         self.assertEqual(html.headers["referrer-policy"], "no-referrer")
         self.assertEqual(self.client.get("/static/app.js").status_code, 200)
+        self.assertEqual(self.client.get("/static/mascot.js").status_code, 200)
+        self.assertEqual(self.client.get("/static/lens.svg").status_code, 200)
 
 
 class IdentityTests(unittest.TestCase):

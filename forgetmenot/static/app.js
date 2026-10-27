@@ -15,6 +15,24 @@ let currentFilter = "all";
 let editing = null;
 let refreshing = false;
 let toastTimer;
+let typingTimer;
+let listening = false;
+let watchSubmitting = false;
+let lastSavedId = null;
+let lensError = "";
+let serverOffline = false;
+
+function updateLens() {
+  const lens = lensState({state, listening, submitting:watchSubmitting, savedId:lastSavedId, error:lensError, offline:serverOffline});
+  $("#mascot").dataset.mode = lens.mode;
+  document.body.dataset.lensMode = lens.mode;
+  $("#input-mode").textContent = lens.mode === "listening" ? "LISTENING" : lens.mode === "locking" ? "FOCUSING" : "TEXT CHANNEL";
+  for (const [id, text] of [["#lens-mode",lens.status],["#lens-title",lens.title],["#lens-detail",lens.detail]]) {
+    if ($(id).textContent !== text) $(id).textContent = text;
+  }
+  $("#machine-count").textContent = String(state?.watches.filter((watch) => watch.status === "active").length || 0).padStart(2,"0");
+  $("#machine-worker").textContent = serverOffline ? "OFFLINE" : state?.worker.error ? "ATTENTION" : state?.worker.running ? "ONLINE" : "OFFLINE";
+}
 
 function toast(message, error = false) {
   $("#toast").textContent = message;
@@ -125,6 +143,7 @@ function renderStatus() {
     button.addEventListener("click", () => navigate("settings"));
     banner.append(button);
   }
+  updateLens();
 }
 
 async function refresh(initial = false) {
@@ -132,13 +151,14 @@ async function refresh(initial = false) {
   refreshing = true;
   try {
     state = await api("/api/state");
+    serverOffline = false;
     $("#login-view").hidden = true;
     $("#app").hidden = false;
     renderWatches(); renderInbox(); renderStatus();
     if (initial) renderSettings();
     return true;
   } catch (error) {
-    if (error.status !== 401) { toast(error.message, true); $("#worker-label").textContent = "Server connection lost"; $("#worker-dot").classList.add("offline"); }
+    if (error.status !== 401) { serverOffline = true; updateLens(); toast(error.message, true); $("#worker-label").textContent = "Server connection lost"; $("#worker-dot").classList.add("offline"); }
     return false;
   } finally { refreshing = false; }
 }
@@ -151,7 +171,7 @@ function navigate(view) {
     button.classList.toggle("selected", selected);
     if (selected) button.setAttribute("aria-current","page"); else button.removeAttribute("aria-current");
   });
-  $("#breadcrumb").textContent = {watches:"Your personal lookout",inbox:"A moment worth remembering",settings:"Your own way of keeping watch"}[view];
+  $("#breadcrumb").textContent = {watches:"PERSONAL MONITOR / OVERVIEW",inbox:"PERSONAL MONITOR / FINDINGS",settings:"PERSONAL MONITOR / CONNECTIONS"}[view];
   if (view === "settings") renderSettings();
   window.scrollTo({top:0,behavior:"instant"});
 }
@@ -160,7 +180,9 @@ function resetWatch() {
   editing = null;
   $("#watch-form").reset();
   $("#cancel-edit").hidden = true;
-  $("#save-watch").innerHTML = 'Keep an eye on it <span aria-hidden="true">↗</span>';
+  $("#save-watch").innerHTML = 'Set watch <span aria-hidden="true">↗</span>';
+  lensError = "";
+  updateLens();
 }
 
 function editWatch(watch) {
@@ -191,7 +213,7 @@ $("#login-form").addEventListener("submit", (event) => {
   event.preventDefault();
   busy(event.submitter, async () => { await api("/api/login","POST",{password:$("#password").value}); $("#password").value = ""; await refresh(true); });
 });
-$("#logout").addEventListener("click", () => busy($("#logout"), async () => { await api("/api/logout","POST",{}); state = null; $("#app").hidden = true; $("#login-view").hidden = false; $("#password").focus(); }));
+$$("[data-lock]").forEach((button) => button.addEventListener("click", () => busy(button, async () => { await api("/api/logout","POST",{}); state = null; $("#app").hidden = true; $("#login-view").hidden = false; $("#password").focus(); })));
 $$("[data-view]").forEach((button) => button.addEventListener("click", () => navigate(button.dataset.view)));
 $$("[data-filter]").forEach((button) => button.addEventListener("click", () => {
   currentFilter = button.dataset.filter;
@@ -200,6 +222,21 @@ $$("[data-filter]").forEach((button) => button.addEventListener("click", () => {
 }));
 $$("[data-example]").forEach((button) => button.addEventListener("click", () => { resetWatch(); $("#goal").value = examples[button.dataset.example]; $("#goal").focus(); }));
 $("#cancel-edit").addEventListener("click", resetWatch);
+$("#goal").addEventListener("focus", () => { listening = true; updateLens(); });
+$("#goal").addEventListener("blur", () => { listening = false; updateLens(); });
+$("#goal").addEventListener("input", () => {
+  listening = true;
+  lensError = "";
+  $("#mascot").dataset.typing = "true";
+  clearTimeout(typingTimer);
+  typingTimer = setTimeout(() => { $("#mascot").dataset.typing = "false"; }, 400);
+  updateLens();
+});
+$("#goal").addEventListener("keydown", (event) => {
+  if (!submitsObjective(event)) return;
+  event.preventDefault();
+  if (!$("#save-watch").disabled) $("#watch-form").requestSubmit($("#save-watch"));
+});
 $("#interval").addEventListener("change", () => {
   $("#frequency-note").textContent = $("#interval").value === "60" ? "Every-minute checks can use 1,440 model and search requests per day, per watch. Checks run sequentially; a slow search may delay the next one." : "Automatic checks usually start daily. Frequent checks use more model and search allowance.";
 });
@@ -209,9 +246,26 @@ $("#watch-form").addEventListener("submit", (event) => {
     if (/\[[^\]]+\]/.test($("#goal").value) && !confirm("This goal still contains square-bracket placeholders. Save it anyway? The model may need more details.")) return;
     const body = {goal:$("#goal").value.trim(), interval:$("#interval").value === "auto" ? null : Number($("#interval").value),
       channels:[...($("#channel-push").checked ? ["push"] : []),...($("#channel-email").checked ? ["email"] : [])]};
-    await api(editing ? `/api/watches/${editing}` : "/api/watches", editing ? "PUT" : "POST", body);
-    const updated = !!editing;
-    resetWatch(); await refresh(); toast(updated ? "Watch updated. A fresh check is queued." : "Remembered. Your watch is safely on the list.");
+    watchSubmitting = true;
+    listening = false;
+    lensError = "";
+    clearTimeout(typingTimer);
+    $("#mascot").dataset.typing = "false";
+    updateLens();
+    try {
+      const result = await api(editing ? `/api/watches/${editing}` : "/api/watches", editing ? "PUT" : "POST", body);
+      const updated = !!editing;
+      lastSavedId = editing || result.id;
+      resetWatch();
+      await refresh();
+      toast(updated ? "Objective revised. A fresh check is queued." : "Objective secured. I’ll take it from here.");
+    } catch (error) {
+      lensError = "Your objective could not be saved. Your text is still here; please try again.";
+      throw error;
+    } finally {
+      watchSubmitting = false;
+      updateLens();
+    }
   });
 });
 $("#watchlist").addEventListener("click", (event) => {

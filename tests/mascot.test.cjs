@@ -1,0 +1,46 @@
+const assert = require("node:assert/strict");
+const {lensState, submitsObjective} = require("../forgetmenot/static/mascot.js");
+
+const fresh = () => ({worker:{running:true,error:""},settings:{model:{}},watches:[],inbox:{notifications:[]}});
+const mode = (options) => lensState({state:fresh(),...options}).mode;
+assert.equal(mode({listening:true}), "listening");
+assert.equal(mode({listening:true,submitting:true}), "locking");
+assert.equal(mode({offline:true}), "attention");
+assert.equal(mode({error:"Save failed"}), "attention");
+assert.equal(lensState({state:null}).mode, "standby");
+
+const state = fresh();
+state.watches = [{id:"test",status:"active",checking:false,error:""}];
+assert.equal(lensState({state}).status, "AWAITING MODEL");
+assert.equal(lensState({state,savedId:"test"}).mode, "locked");
+assert.match(lensState({state,savedId:"test"}).detail, /Connect a model/);
+state.watches[0].status = "paused";
+assert.equal(lensState({state,savedId:"test"}).mode, "standby");
+state.watches[0].status = "active";
+state.settings.model.id = "test-model";
+assert.equal(lensState({state}).mode, "locked");
+state.watches[0].checking = true;
+assert.equal(lensState({state}).mode, "searching");
+state.watches[0].checking = false;
+state.watches[0].error = "Source offline";
+assert.equal(lensState({state}).mode, "attention");
+state.worker.running = false;
+assert.equal(lensState({state}).mode, "offline");
+state.worker.running = true;
+state.worker.error = "Storage temporarily unavailable";
+assert.equal(lensState({state}).mode, "attention");
+state.worker.error = "";
+state.watches = [];
+state.inbox.notifications = [{kind:"attention",seen:false}];
+assert.equal(lensState({state}).mode, "standby");
+state.inbox.notifications = [{kind:"match",seen:false}];
+assert.equal(lensState({state}).mode, "found");
+state.inbox.notifications[0].seen = true;
+assert.equal(lensState({state}).mode, "standby");
+
+assert.equal(submitsObjective({key:"Enter"}), true);
+assert.equal(submitsObjective({key:"Enter",shiftKey:true}), false);
+assert.equal(submitsObjective({key:"Enter",isComposing:true}), false);
+assert.equal(submitsObjective({key:"Enter",keyCode:229}), false);
+assert.equal(submitsObjective({key:"a"}), false);
+console.log("22 mascot state and keyboard checks passed.");
