@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#f6f5ef">
+  <title>ForgetMeNot — a little less to remember</title>
+  <meta name="description" content="A quiet place for things worth waiting for. Personal AI watches with evidence, durable schedules and thoughtful notifications.">
+  <link rel="icon" href="/static/flower.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/app.js" defer></script>
+</head>
+<body>
+  <div id="toast" role="status" aria-live="polite" hidden></div>
+  <main id="login-view" class="login-view">
+    <form id="login-form" class="login-card">
+      <img src="/static/flower.svg" width="54" height="54" alt="">
+      <p class="eyebrow">A LITTLE LESS TO REMEMBER</p>
+      <h1>ForgetMeNot<span>.</span></h1>
+      <p>A quiet place for the things you don’t want to lose track of.</p>
+      <label for="password">Your instance password</label>
+      <input id="password" type="password" autocomplete="current-password" required maxlength="1024">
+      <button class="primary" type="submit">Unlock your watchlist <span aria-hidden="true">↗</span></button>
+      <p class="small muted">Your server keeps watch, even when this tab is closed.</p>
+    </form>
+  </main>
+
+  <div id="app" class="app-shell" hidden>
+    <aside class="sidebar">
+      <a class="wordmark" href="/" aria-label="ForgetMeNot home"><img src="/static/flower.svg" width="30" height="30" alt="">ForgetMeNot<span>.</span></a>
+      <p class="sidebar-caption">A LITTLE LESS TO REMEMBER</p>
+      <nav aria-label="Main navigation">
+        <button class="nav-item selected" data-view="watches" aria-current="page"><span aria-hidden="true">◷</span> My watches <span id="nav-count" class="nav-count">0</span></button>
+        <button class="nav-item" data-view="inbox"><span aria-hidden="true">▱</span> Inbox <span id="inbox-count" class="nav-count" hidden>0</span></button>
+        <button class="nav-item" data-view="settings"><span aria-hidden="true">⚙</span> Settings</button>
+      </nav>
+      <div class="sidebar-note"><div class="mini-flower" aria-hidden="true">✳</div><p>Some things are worth<br>waiting for.</p><span>I’ll keep an eye on them.</span></div>
+      <div class="sidebar-bottom"><p><span id="worker-dot" class="dot"></span><span id="worker-label">Connecting</span></p><button id="logout" class="text-button">Lock instance ↗</button><span class="swarmkind">MADE BY SWARMKIND</span></div>
+    </aside>
+
+    <main class="workspace">
+      <header class="topbar"><span id="breadcrumb">Your personal lookout</span><span class="private-label"><span aria-hidden="true">◈</span> YOUR INSTANCE · YOUR DATA</span></header>
+      <div id="connection-banner" class="banner" hidden></div>
+
+      <section id="view-watches" class="page" aria-labelledby="watches-heading">
+        <div class="page-heading"><div><p class="eyebrow">SPACE FOR EVERYTHING ELSE</p><h1 id="watches-heading">Leave it with me<span>.</span></h1><p>Tell me what matters. I’ll look out for the right moment.</p></div><div class="date-mark"><span id="today"></span><span class="handwritten">No need to keep checking.</span></div></div>
+        <div class="compose-grid">
+          <form id="watch-form" class="compose-card">
+            <div class="card-heading"><span class="number-label">01 / A NEW WATCH</span><span class="tiny-flower" aria-hidden="true">✳</span></div>
+            <label for="goal" class="compose-label">What would you like me to look out for?</label>
+            <textarea id="goal" rows="3" minlength="5" maxlength="4000" required placeholder="Let me know when a great new co-op game is out on PC, with an OpenCritic score of 85 or above…"></textarea>
+            <div class="compose-hint"><span aria-hidden="true">✧</span> A clear goal is enough. I’ll work out how to check it.</div>
+            <details id="advanced"><summary>Fine-tune this watch <span aria-hidden="true">+</span></summary><div class="advanced-fields"><label for="interval">Check frequency</label><select id="interval"><option value="auto">Let the AI choose</option><option value="60">Every minute</option><option value="300">Every 5 minutes</option><option value="900">Every 15 minutes</option><option value="3600">Hourly</option><option value="21600">Every 6 hours</option><option value="86400">Daily</option><option value="604800">Weekly</option><option value="2592000">Every 30 days</option></select><p id="frequency-note" class="small muted">Automatic checks usually start daily. Frequent checks use more model and search allowance.</p><fieldset><legend>Notify me through</legend><label class="check"><input type="checkbox" checked disabled> In-app inbox <span class="muted">always on</span></label><label class="check"><input id="channel-push" type="checkbox"> Push via ntfy</label><label class="check"><input id="channel-email" type="checkbox"> Email</label></fieldset></div></details>
+            <div class="compose-footer"><span id="model-caption" class="small muted">Choose a model in Settings</span><div><button id="cancel-edit" type="button" class="secondary" hidden>Cancel</button><button id="save-watch" type="submit" class="primary">Keep an eye on it <span aria-hidden="true">↗</span></button></div></div>
+          </form>
+          <aside class="quiet-card"><span class="number-label">A LITTLE PEACE OF MIND</span><div class="botanical" aria-hidden="true"><svg viewBox="0 0 220 175" fill="none"><path d="M108 170c-2-48 4-83 33-119M108 171c-1-44-27-56-51-80M110 154c18-16 37-18 55-15M113 113c-7-22-21-32-37-34" stroke="#547059" stroke-width="2"/><path d="M108 148c-1-26-30-48-47-38 3 22 24 36 47 38ZM119 147c12-25 34-25 45-10-10 17-27 23-45 10Z" fill="#a8b498"/><g transform="translate(142 51)"><ellipse cy="-19" rx="13" ry="19" fill="#8f97c6"/><ellipse cy="-19" rx="13" ry="19" fill="#a8add5" transform="rotate(72)"/><ellipse cy="-19" rx="13" ry="19" fill="#8f97c6" transform="rotate(144)"/><ellipse cy="-19" rx="13" ry="19" fill="#b8bcdd" transform="rotate(216)"/><ellipse cy="-19" rx="13" ry="19" fill="#9ca3cf" transform="rotate(288)"/><circle r="7" fill="#e6c87b"/></g><g transform="translate(58 88) scale(.62)"><ellipse cy="-19" rx="13" ry="19" fill="#c2c6e3"/><ellipse cy="-19" rx="13" ry="19" fill="#a8add5" transform="rotate(72)"/><ellipse cy="-19" rx="13" ry="19" fill="#c2c6e3" transform="rotate(144)"/><ellipse cy="-19" rx="13" ry="19" fill="#a8add5" transform="rotate(216)"/><ellipse cy="-19" rx="13" ry="19" fill="#b8bcdd" transform="rotate(288)"/><circle r="7" fill="#e6c87b"/></g></svg></div><h2>You can put<br>a pin in that.</h2><p>The sold-out thing. The next big discovery. The moment you’ve been waiting for.</p><div class="quiet-footer"><span class="dot"></span> Remembered here. Off your mind.</div></aside>
+        </div>
+        <div class="watchlist-heading"><h2>Your watchlist <span id="watch-total">00</span></h2><div class="filters" role="group" aria-label="Filter watches"><button data-filter="all" class="active" aria-pressed="true">All</button><button data-filter="active" aria-pressed="false">Watching</button><button data-filter="matched" aria-pressed="false">Found</button><button data-filter="paused" aria-pressed="false">Paused</button></div></div>
+        <div id="watchlist" class="watchlist"></div>
+        <div id="empty-state" class="empty-state"><span class="empty-icon" aria-hidden="true">↳</span><div><h3>A little inspiration, if you need it.</h3><p>Choose an example, add your details, and make it yours.</p></div></div>
+        <div id="examples" class="examples"><button data-example="stock"><span class="example-icon" aria-hidden="true">▧</span><span><strong>The one that’s sold out</strong><small>Stock, preorders & availability</small></span><span aria-hidden="true">↗</span></button><button data-example="research"><span class="example-icon" aria-hidden="true">✧</span><span><strong>A discovery worth knowing</strong><small>Research & treatment developments</small></span><span aria-hidden="true">↗</span></button><button data-example="games"><span class="example-icon" aria-hidden="true">⌘</span><span><strong>Your next favourite game</strong><small>Releases with the ratings to match</small></span><span aria-hidden="true">↗</span></button></div>
+        <footer class="page-footer"><span>A small place for long-term possibilities.</span><span>FORGETMENOT / 0.1</span></footer>
+      </section>
+
+      <section id="view-inbox" class="page" hidden aria-labelledby="inbox-heading"><div class="page-heading"><div><p class="eyebrow">THE MOMENT YOU WERE WAITING FOR</p><h1 id="inbox-heading">Worth your attention<span>.</span></h1><p>Findings with their sources, and notices when a watch needs your help.</p></div><button id="mark-read" class="secondary">Mark all as read</button></div><div id="inbox-list" class="inbox-list"></div></section>
+
+      <section id="view-settings" class="page" hidden aria-labelledby="settings-heading"><div class="page-heading"><div><p class="eyebrow">MAKE YOURSELF AT HOME</p><h1 id="settings-heading">A few connections<span>.</span></h1><p>Your account, your choice of model, your way of hearing about it.</p></div></div>
+        <div class="settings-grid"><form id="settings-form" class="settings-card"><p class="number-label">01 / ACCOUNTS & DELIVERY</p><h2>Bring your own intelligence.</h2><label for="provider">AI provider</label><select id="provider"><option value="openrouter">OpenRouter</option><option value="chatgpt">ChatGPT subscription</option><option value="gemini_cli">Google subscription · Gemini CLI</option><option value="claude">Claude API</option></select>
+          <div class="provider-panel" data-provider="openrouter"><p>Connect your account or use an OpenRouter API key. Choose models from multiple providers.</p><button type="button" class="secondary oauth-button" data-oauth="openrouter">Connect OpenRouter ↗</button><label for="openrouter-key">OpenRouter API key</label><input id="openrouter-key" type="password" autocomplete="off" placeholder="Leave empty to keep the saved key"><p id="openrouter-status" class="small muted"></p></div>
+          <div class="provider-panel" data-provider="chatgpt" hidden><p>Use an eligible ChatGPT plan through OpenAI’s official sign-in. Your account must grant plan usage.</p><label for="chatgpt-account">Saved connection</label><select id="chatgpt-account"><option value="">Add a new connection</option></select><div class="button-row"><button type="button" class="secondary oauth-button" data-oauth="chatgpt">Continue with ChatGPT ↗</button><button id="choose-account" type="button" class="text-button">Use selected</button></div><button id="disconnect-account" type="button" class="text-button danger">Disconnect selected connection</button><p id="chatgpt-loopback" class="small muted"></p><a href="https://chatgpt.com/settings/usage" target="_blank" rel="noopener noreferrer">Manage ChatGPT plan usage ↗</a></div>
+          <div class="provider-panel" data-provider="gemini_cli" hidden><p>Uses the official Gemini CLI and its saved Google sign-in on this server. Eligible Google AI subscriptions use their CLI allowance.</p><p class="small muted">Install and sign in to Gemini CLI under the same OS user as ForgetMeNot. This is a server-side connection; there is no subscription token to paste here. See the README for setup.</p></div>
+          <div class="provider-panel" data-provider="claude" hidden><p>Use a Claude Console API key, or choose a Claude model through OpenRouter. Anthropic does not offer this app access to Claude subscription allowances.</p><label for="claude-key">Claude Console API key</label><input id="claude-key" type="password" autocomplete="off" placeholder="Leave empty to keep the saved key"><p id="claude-status" class="small muted"></p></div>
+          <hr><h2>When something turns up.</h2><p>Your in-app inbox is always enabled. Add another channel to receive findings away from the app.</p><label for="email">Email address</label><input id="email" type="email" autocomplete="email" placeholder="you@example.com"><p id="smtp-status" class="small muted"></p><label for="ntfy-topic">ntfy.sh push topic</label><input id="ntfy-topic" autocomplete="off" placeholder="Your private, unguessable topic"><label for="ntfy-token">ntfy access token <span class="muted">optional</span></label><input id="ntfy-token" type="password" autocomplete="off" placeholder="Leave empty to keep the saved token"><p class="small muted">Subscribe to this topic in the ntfy app. Use an access-controlled topic for private findings; public topics can be read by anyone who knows the name.</p><button class="primary" type="submit">Save connections <span aria-hidden="true">↗</span></button>
+        </form><div><form id="model-form" class="settings-card"><p class="number-label">02 / YOUR MODEL</p><h2>Choose who keeps watch.</h2><p>Load the current model catalog for the provider selected on the left.</p><button id="load-models" type="button" class="secondary">Load available models ↻</button><label for="model">Model</label><input id="model" list="model-list" autocomplete="off" maxlength="200" placeholder="Load models, then type to search" required><datalist id="model-list"></datalist><p id="model-note" class="small muted">Model availability and web-search support depend on your account. Google also accepts a model ID supported by your CLI.</p><button type="submit" class="primary">Use this model <span aria-hidden="true">↗</span></button><p id="current-model" class="small muted"></p></form><div class="settings-note"><span aria-hidden="true">◈</span><h3>A note on quiet persistence.</h3><p>The server must stay running to keep checking. Watches survive restarts; missed intervals resume with one fresh check.</p><p>Search and model usage may be billed or count towards subscription limits. Every-minute checks can run 1,440 times a day per watch.</p><p>Matches stop their watch after one notification. Rearm a watch to look again. A failed delivery stays queued for retry.</p></div></div></div>
+      </section>
+    </main>
+  </div>
+  <dialog id="history-dialog"><div class="dialog-heading"><div><p class="eyebrow">THE PAPER TRAIL</p><h2 id="history-title">Watch history</h2></div><button id="close-history" class="icon-button" aria-label="Close history">×</button></div><div id="history-content"></div></dialog>
+</body>
+</html>

@@ -1,0 +1,18 @@
+services:
+  forgetmenot:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "127.0.0.1:8787:8787"
+    volumes:
+      - forgetmenot-data:/data
+    init: true
+    stop_grace_period: 210s
+    healthcheck:
+      test: ["CMD", "python", "-c", "import os,urllib.request; r=urllib.request.Request('http://127.0.0.1:8787/',headers={'Host':urllib.parse.urlsplit(os.environ.get('FORGETMENOT_BASE_URL','http://127.0.0.1:8787')).netloc}); urllib.request.urlopen(r,timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+volumes:
+  forgetmenot-data:
